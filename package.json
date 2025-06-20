@@ -1,0 +1,16 @@
+{
+  "name": "youtube_clone_backend",
+  "version": "1.0.0",
+  "description": "Youtube backend clone using javascript.",
+  "keywords": [
+    "youtube_clone",
+    "javascript"
+  ],
+  "license": "ISC",
+  "author": "Darshan Baldha",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
