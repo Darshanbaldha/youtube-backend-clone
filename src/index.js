@@ -3,9 +3,20 @@ import dotenv from "dotenv";
 import connectDB from "./db/db.js";
 
 dotenv.config({
-    path: "./env"
-})
-connectDB();
+  path: "./env",
+});
+
+// connectDB is write async(asyncronus) and by default it return promise so we can add then and catch.
+connectDB()
+  .then(() => {
+    let port = process.env.PORT || 3000;
+    app.listen(port, () => {
+        console.log(`Server is running at port ${port}.`);
+    });
+  })
+  .catch((error) => {
+    console.error(`DB Connect Error: ${error}`);
+  });
 /*
 import mongoose from "mongoose";
 import { DB_NAME } from "./constants";
