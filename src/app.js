@@ -1,7 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-
+import userRouter from "./routes/user.routes.js";
 const app = express();
 
 // .use is used for middleware or configuration like cors,etc.
@@ -27,4 +27,9 @@ app.use(express.static("public"));
 
 // cookie-parser is used to access the cookie of the browser by the server. Server can perform CRUD operation on browser's cookie by the usong of cookie-parser.
 app.use(cookieParser());
-export default app;
+
+// routes
+app.use("/api/v1/users", userRouter);
+// http://localhost:8000/api/v1/users/register
+
+export { app };
