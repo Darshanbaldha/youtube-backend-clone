@@ -1,3 +1,4 @@
+// this is used to stop any function until the server not give the response or request from browser and also give the errors if like network error.
 // using promises or then...catch
 const asyncHandler = (requestHandler) => {
   return (req, res, next) => {

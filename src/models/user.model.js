@@ -54,9 +54,14 @@ userSchema.pre("save", async function (next) {
   // checking if password is modofied or not.
   if (this.isModified("password")) {
     // encryptthe password.
-    this.password = bcrypt.hash(this.password, 10);
+    // next() is a callback function that pass control to the next middleware funcion.
+    // middleware function has access of req and res object lifecycle.
+    // it does's not end req-res cycle.
+    this.password = await bcrypt.hash(this.password, 10);
     next();
   } else {
+    // we return next() because here nothing to return other data.
+    // In below function we does't pass next() because we already return the function or data.
     return next();
   }
 });
@@ -66,6 +71,7 @@ userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
+// create a token using jwt
 userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     {
@@ -80,6 +86,8 @@ userSchema.methods.generateAccessToken = function () {
     }
   );
 };
+
+// create a refresh token using jwt
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {

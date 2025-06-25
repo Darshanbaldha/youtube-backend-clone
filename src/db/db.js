@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { DB_NAME } from "../constants.js";
 
+// Give the connection with the mongodb database.
 const connectDB = async () => {
   try {
     // try to connect the database
@@ -8,7 +9,7 @@ const connectDB = async () => {
       `${process.env.MONGODB_URL}/${DB_NAME}`,
       { useNewUrlParser: true, useUnifiedTopology: true }
     );
-    console.log(`Mongodb Connected ${connectionInstance}`);
+    console.log(`Mongodb Connected ${JSON.stringify(connectionInstance)}`);
     console.log(
       `Mongodb Connected !! on host ${connectionInstance.connection.host}`
     );

@@ -1,3 +1,4 @@
+// error class so that we does not send res.send error every time only write error code and msg.
 class ApiError extends Error {
   constructor(
     statusCode,
