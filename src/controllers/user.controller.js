@@ -88,4 +88,109 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new Apiresponses(200, createdUser, "user registered successfully"));
 });
 
-export { registerUser };
+// generateAccessAndRefreshToken is a method
+const generateAccessAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: true });
+
+    return accessToken, refreshToken;
+  } catch (error) {
+    throw new apiErrors(500, "Tokens are not generated.");
+  }
+};
+
+const loginUser = asyncHandler(async (req, res) => {
+  // req body -> data
+  // username or email
+  // find the user
+  // if find the user then check the password
+  // generate access and refresh token
+  // send cookie
+
+  // data comes from login form.
+  const { username, email, password } = req.body;
+  if (!username || !email) {
+    throw new apiErrors(400, "Username or email require.");
+  }
+
+  // from body check if user exists or not in db.
+  const user = await User.findOne({
+    $or: [{ username }, { email }],
+  });
+
+  if (!user) {
+    throw new apiErrors(404, "User does not exists.");
+  }
+
+  // if user exists then check the password is correct or not.
+  const checkPassword = await user.isPasswordCorrect(password);
+  if (!checkPassword) {
+    throw new apiErrors(401, "Invalid password");
+  }
+
+  // now take the tokens from generateAccessAndRefreshToken through id of the logged in user in the db.
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  // if want to not send the password and token to the user the remove it or else ignore below line.
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  // for cookie
+  // cookie is modified by frontend by default, by enabling this option(httpOnly and secure) it can only modified by the server.
+  const option = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  // return the response to user
+  // we send cookie to user but in json we send cookie them because if user/browser store cookie in the localstorage or any else storage then it have access to where stire the cookie.
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, option)
+    .cookie("refreshToken", refreshToken, option)
+    .json(
+      new Apiresponses(
+        200,
+        { user: loggedInUser, accessToken, refreshToken },
+        "Successfully Logged In"
+      )
+    );
+});
+
+// logout method
+const logoutUser = asyncHandler(async (req, res) => {
+  // find the id and update
+  await User.findByIdAndUpdate(
+    // give the id of user and id comes from auth middleware.
+    req.user._id,
+    {
+      // update refreshtoken value and set it to undefined.
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+  const option = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessTokenS", option)
+    .clearCookie("refreshTokenS", option)
+    .json(new Apiresponses(200, {}, "Looged Out."));
+});
+
+export { registerUser, loginUser, logoutUser };
