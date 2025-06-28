@@ -66,7 +66,7 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// for check if the encrypted password and normal password is match or not.
+// for check if the encrypted password and normal password is match or not. And where the isPasswordCorrect method is used it takes password parameter and compare it with db's password.
 userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };

@@ -9,7 +9,8 @@ const connectDB = async () => {
       `${process.env.MONGODB_URL}/${DB_NAME}`,
       { useNewUrlParser: true, useUnifiedTopology: true }
     );
-    console.log(`Mongodb Connected ${JSON.stringify(connectionInstance)}`);
+    console.dir(`Mongodb Connected ${connectionInstance}`);
+    // console.dir(connectionInstance, { depth: null });
     console.log(
       `Mongodb Connected !! on host ${connectionInstance.connection.host}`
     );

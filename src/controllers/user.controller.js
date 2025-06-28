@@ -1,9 +1,9 @@
-import { jwt } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { User } from "../models/user.model.js";
-import apiErrors from "../utils/apiErrors.js";
 import { Apiresponses } from "../utils/apiResponses.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
+import ApiError from "../utils/apiErrors.js";
 
 const registerUser = asyncHandler(async (req, res) => {
   // res.status(200).json({
@@ -21,16 +21,17 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // all fields takes from body which is given by the request/response of brower.
   const { fullname, username, email, password } = req.body;
-  console.log(email);
+  console.table({ fullname, username, email, password });
   // if given array fiels is empty or any of one is empty then return true and run if part.
   // array take data comes from user check all data and give all data's return true or false.
   // we give him all data from user as field name. now fiels are one by one trim and after trimed it compare to empty string. if both are similear then return true.
   if (
     [fullname, username, email, password].some((field) => {
+      console.log(`user.controller.js 1.field:- ${field}`);
       return field?.trim() === "";
     })
   ) {
-    throw new apiErrors(400, "All fields are required");
+    throw new ApiError(400, "All fields are required");
   }
 
   // if all data are not empty then check user is already exested in db or not.
@@ -39,13 +40,14 @@ const registerUser = asyncHandler(async (req, res) => {
     $or: [{ username }, { email }],
   });
   if (existedUser) {
-    throw new apiErrors(409, "email or username already taken.");
+    throw new ApiError(409, "email or username already taken.");
   }
+  console.log(`user.controller.js 2.Existed User:- ${existedUser}`);
 
   // now checking file's local path
   const avtarLocalPath = req.files?.avtar[0]?.path;
   // const coverImageLocalPath = req.files?.coverImage[0]?.path; // this give the problem because if file not present then it not give the path.
-
+  console.log(`user.controller.js 3.Avtar Local Path:- ${avtarLocalPath}`);
   let coverImageLocalPath;
   if (
     req.files &&
@@ -53,17 +55,26 @@ const registerUser = asyncHandler(async (req, res) => {
     req.files.coverImage.length > 0
   ) {
     coverImageLocalPath = req.files.coverImage[0].path;
+    // console.log(`user.controller.js 4.Files:- ${req.files}`);
+    // console.log(`user.controller.js 5.Array of cover image:- ${Array.isArray(req.files.coverImage)}`);
+    // console.log(`user.controller.js 6.Length:- ${req.files.coverImage.length}`);
+    // console.log(`user.controller.js 7.Cover Image Local Path:- ${coverImageLocalPath}`);
   }
 
   if (!avtarLocalPath) {
-    throw new apiErrors(400, "Avtar file is required. .");
+    throw new ApiError(400, "Avtar file is required. .");
   }
   // uploading on the cloudinary web site by the localpath
   const avtar = await uploadOnCloudinary(avtarLocalPath);
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
+  console.log(`user.controller.js 8.Avtar:- ${avtar}`);
+  console.dir(avtar);
+  console.log(`user.controller.js 9.Cover Image:- ${coverImage}`);
+  console.dir(coverImage);
+
   if (!avtar) {
-    throw new apiErrors(400, "Avtar file is required. .");
+    throw new ApiError(400, "Avtar file is required. .");
   }
   // creating the user in the db fields
   const user = await User.create({
@@ -81,7 +92,7 @@ const registerUser = asyncHandler(async (req, res) => {
   );
   // if not find the then give the error.
   if (!createdUser) {
-    throw new apiErrors(500, "user not registered.");
+    throw new ApiError(500, "user not registered.");
   }
 
   return res
@@ -95,13 +106,16 @@ const generateAccessAndRefreshToken = async (userId) => {
     const user = await User.findById(userId);
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
+    console.log(`user.controller.js 10.user :- ${user}`);
+    console.log(`user.controller.js 11.Access Token :- ${accessToken}`);
+    console.log(`user.controller.js 12.Refresh Token :- ${refreshToken}`);
 
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: true });
 
     return accessToken, refreshToken;
   } catch (error) {
-    throw new apiErrors(500, "Tokens are not generated.");
+    throw new ApiError(500, "Tokens are not generated.");
   }
 };
 
@@ -116,7 +130,7 @@ const loginUser = asyncHandler(async (req, res) => {
   // data comes from login form.
   const { username, email, password } = req.body;
   if (!(username || email)) {
-    throw new apiErrors(400, "Username or email require.");
+    throw new ApiError(400, "Username or email require.");
   }
 
   // from body check if user exists or not in db.
@@ -125,13 +139,16 @@ const loginUser = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    throw new apiErrors(404, "User does not exists.");
+    throw new ApiError(404, "User does not exists.");
   }
+
+  console.log(`user.controller.js 13.user :- ${user}`);
 
   // if user exists then check the password is correct or not.
   const checkPassword = await user.isPasswordCorrect(password);
+  console.log(`user.controller.js 14.Check Password :- ${checkPassword}`);
   if (!checkPassword) {
-    throw new apiErrors(401, "Invalid password");
+    throw new ApiError(401, "Invalid password");
   }
 
   // now take the tokens from generateAccessAndRefreshToken through id of the logged in user in the db.
@@ -194,14 +211,16 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new Apiresponses(200, {}, "Looged Out."));
 });
 
-//
+// when Access Token is expire then this method calls. And it refresh the access token.
 const refreshAccessToken = asyncHandler(async (req, res) => {
   // cookie is from the web and body is used in mobile.
   // if frontend hit the request for generate new ACCESS TOKEN or expire ACCESS TOKEN.
   const incomingRefreshToken = req.cookie.refreshToken || req.body.refreshToken;
-
-  if (incomingRefreshToken) {
-    throw new apiErrors(401, "unauthorized response.");
+  console.log(
+    `user.controller.js 15.Incoming Refresh Token :- ${incomingRefreshToken}`
+  );
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, "unauthorized response.");
   }
 
   try {
@@ -212,14 +231,16 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET
     );
 
+    console.log(`user.controller.js 16.Decoded Token :- ${decodedToken}`);
+
     const user = await User.findById(decodedToken._id);
 
     if (!user) {
-      throw new apiErrors(401, "Invalid refresh token");
+      throw new ApiError(401, "Invalid refresh token");
     }
 
     if (incomingRefreshToken !== user?.refreshToken) {
-      throw new apiErrors(401, "Refresh Token Expire.");
+      throw new ApiError(401, "Refresh Token Expire.");
     }
 
     const option = {
@@ -229,6 +250,10 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     const { accessToken, newRefreshToken } =
       await generateAccessAndRefreshToken(user._id);
+
+    console.log(
+      `user.controller.js 17.New Refresh Token :- ${newRefreshToken}`
+    );
 
     return res
       .status(200)
@@ -242,7 +267,135 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         )
       );
   } catch (error) {
-    throw new apiErrors(401, error?.message || "Invalid Refresh Token");
+    throw new ApiError(401, error?.message || "Invalid Refresh Token");
   }
 });
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+
+// change the password
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  // req.user?.id is come from auth.middleware in verifyJWT's ending line. And it verifyJWT is connected with changeCurrentPassword through user.route.js.
+  const user = await User.findById(req.user?._id);
+
+  // isPasswordCorrect is comes from user.model.js and return true or false if oldpassword and db's password match of not.
+  const isCorrectPassword = await user.isPasswordCorrect(oldPassword);
+
+  if (!isCorrectPassword) {
+    throw new ApiError(400, "Invalid Old Password.");
+  }
+  console.log(
+    `user.controller.js 18. Is Correct Password ${isCorrectPassword}`
+  );
+
+  // set newpassword as password and save it in db. If it save in db then it go on user.model.js and inseide it go on .pre method. And after it encrypt the password.
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: true });
+
+  return res
+    .status(200)
+    .json(new Apiresponses(200, {}, "Password Updated Successfully."));
+});
+
+// if user is logged in then get user info.
+// req.user comes from auth.middleware.js
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return res
+    .status(200)
+    .json(200, req.user, "Current User Fetch Successfully.");
+});
+
+// Change account detail(username, fullname, etc)
+const updateAccountDetail = asyncHandler(async (req, res) => {
+  const { fullname, email } = req.body;
+
+  if (!fullname || !email) {
+    throw new ApiError(400, "All fields are required.");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        // fullname: fullname
+        // email: email,
+        fullname,
+        email,
+      },
+    },
+    // new: true only give the value after it update.
+    { new: true }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(200, user, "Account Detail Updated Successffully.");
+});
+
+// change or update files(avtar)
+const updateUserAvtar = asyncHandler(async (req, res) => {
+  const avtarLocalPath = req.file?.path;
+  console.log(`user.controller.js 19. Avtar Local Path ${avtarLocalPath}`);
+  if (!avtarLocalPath) {
+    throw new ApiError(400, "Avtar not found.");
+  }
+
+  const avtar = await uploadOnCloudinary(avtarLocalPath);
+  console.log(`user.controller.js 20. Avtar ${avtar}`);
+  if (!avtar.url) {
+    throw new ApiError(400, "Url not Found of avatar.");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: { avtar: avtar.url },
+    },
+    { new: true }
+  ).select("-password");
+
+  return res
+    .sttus(200)
+    .json(new Apiresponses(200, { user }, "Avtar updated Successfully."));
+});
+
+// change or update files(Cover Image)
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
+  console.log(
+    `user.controller.js 21. Cover Image local Path ${coverImageLocalPath}`
+  );
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "Cover Image not found.");
+  }
+
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  console.log(`user.controller.js 22. Cover Image ${coverImage}`);
+  if (!coverImage.url) {
+    throw new ApiError(400, "Url not Found of avatar.");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: { coverImage: coverImage.url },
+    },
+    { new: true }
+  ).select("-password");
+
+  return res
+    .sttus(200)
+    .json(new Apiresponses(200, { user }, "Cover Image updated Successfully."));
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateAccountDetail,
+  updateUserAvtar,
+  updateUserCoverImage,
+};
