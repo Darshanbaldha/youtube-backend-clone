@@ -302,7 +302,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
-    .json(200, req.user, "Current User Fetch Successfully.");
+    .json(new Apiresponses(200, req.user, "Current User Fetch Successfully."));
 });
 
 // Change account detail(username, fullname, etc)
@@ -329,7 +329,7 @@ const updateAccountDetail = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(200, user, "Account Detail Updated Successffully.");
+    .json(new Apiresponses(200, user, "Account Detail Updated Successffully."));
 });
 
 // change or update files(avtar)
@@ -388,6 +388,89 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new Apiresponses(200, { user }, "Cover Image updated Successfully."));
 });
 
+// aggeration pipeline
+// get details of channel's subscriber. and how many channel i subcribed.
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  // params is taken through the url.And in this params username is present.
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "username is missing");
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      // how many users(chennel) subscribed my chennel.
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      // how many chennel(user) i subscried.
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      // make a new field in db.
+      $addFields: {
+        // count the number of subscriber of the chennel.
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        // count the number of channel i subscribed.
+        chennelsSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        // check whether i follow a perticuler channel or not. used to show subscribe or subscribed button.
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullname: 1,
+        username: 1,
+        subscribersCount: 1,
+        chennelsSubscribedToCount: 1,
+        isSubscribed: 1,
+        avtar: 1,
+        coverImage: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  if (!channel?.length) {
+    throw new ApiError(404, "chennel does not exists");
+  }
+  console.log(`user.controller.js 22.Chennel ${channel}`);
+  console.log(`user.controller.js 23.Chennel length ${channel.length}`);
+  console.log(`user.controller.js 23.Chennel 0th object ${channel[0]}`);
+
+  return res
+    .status(200)
+    .json(
+      new Apiresponses(200, channel[0], "User channel fetched successfully.")
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -398,4 +481,5 @@ export {
   updateAccountDetail,
   updateUserAvtar,
   updateUserCoverImage,
+  getUserChannelProfile,
 };
