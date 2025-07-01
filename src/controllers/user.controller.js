@@ -4,6 +4,7 @@ import { Apiresponses } from "../utils/apiResponses.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
 import ApiError from "../utils/apiErrors.js";
+import mongoose from "mongoose";
 
 const registerUser = asyncHandler(async (req, res) => {
   // res.status(200).json({
@@ -113,7 +114,7 @@ const generateAccessAndRefreshToken = async (userId) => {
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: true });
 
-    return accessToken, refreshToken;
+    return { accessToken, refreshToken };
   } catch (error) {
     throw new ApiError(500, "Tokens are not generated.");
   }
@@ -190,9 +191,13 @@ const logoutUser = asyncHandler(async (req, res) => {
     // give the id of user and id comes from auth middleware.
     req.user._id,
     {
-      // update refreshtoken value and set it to undefined.
-      $set: {
-        refreshToken: undefined,
+      // update refreshtoken value and set it to null.(basically remove the refreshtoken)
+      // $set: {
+      //   refreshToken: null,
+      // },
+      // OR also you can use this
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -206,8 +211,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .clearCookie("accessTokenS", option)
-    .clearCookie("refreshTokenS", option)
+    .clearCookie("accessToken", option)
+    .clearCookie("refreshToken", option)
     .json(new Apiresponses(200, {}, "Looged Out."));
 });
 
@@ -215,7 +220,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 const refreshAccessToken = asyncHandler(async (req, res) => {
   // cookie is from the web and body is used in mobile.
   // if frontend hit the request for generate new ACCESS TOKEN or expire ACCESS TOKEN.
-  const incomingRefreshToken = req.cookie.refreshToken || req.body.refreshToken;
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
   console.log(
     `user.controller.js 15.Incoming Refresh Token :- ${incomingRefreshToken}`
   );
@@ -232,12 +238,15 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     );
 
     console.log(`user.controller.js 16.Decoded Token :- ${decodedToken}`);
+    console.dir(decodedToken);
 
-    const user = await User.findById(decodedToken._id);
+    const user = await User.findById(decodedToken?._id);
 
     if (!user) {
       throw new ApiError(401, "Invalid refresh token");
     }
+
+    console.log(`user.controller.js 16.1 user: ${user}`);
 
     if (incomingRefreshToken !== user?.refreshToken) {
       throw new ApiError(401, "Refresh Token Expire.");
@@ -248,21 +257,23 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       secure: true,
     };
 
-    const { accessToken, newRefreshToken } =
+    const { accessToken, refreshToken } =
       await generateAccessAndRefreshToken(user._id);
-
-    console.log(
-      `user.controller.js 17.New Refresh Token :- ${newRefreshToken}`
-    );
+    console.log(`user.controller.js 17.New Refresh Token :- ${refreshToken}`);
+    console.log(`user.controller.js 17.New Access Token :- ${accessToken}`);
+    
+    // const token = await generateAccessAndRefreshToken(user._id);
+    // console.log(`user.controller.js 17.1 New Refresh Token :- ${token}`);
+    // console.dir(token);
 
     return res
       .status(200)
       .cookie("accessToken", accessToken, option)
-      .cookie("refreshToken", newRefreshToken, option)
+      .cookie("refreshToken", refreshToken, option)
       .json(
         new Apiresponses(
           200,
-          { accessToken, refreshToken: newRefreshToken },
+          { accessToken, refreshToken },
           "Access Token Refreshed."
         )
       );
@@ -471,6 +482,66 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     );
 });
 
+// get watchHistory
+const getWatchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    // first pipeline or first stage.
+    // we use this -> (mongoose.Typ....) instead of this -> (req.user._id) because mongodb can't directily not access string of _if.
+    // It's syntex is objectId('string').
+    // but mongoose convert string into that syntex for us. And in aggeration code it can't convert so we have to write this syntex -> (mongoose.Typ....).
+    {
+      $match: { _id: mongoose.Types.ObjectId(req.user._id) },
+    },
+    // secound pipeline or secound stage
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        // pipeline inside pipeline (nested pipeline.)
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avtar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              // it getr first value of array. Otherwise we have to use a loop to get the data.
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new Apiresponses(
+        200,
+        user[0].watchHistory,
+        "Watch history fetched successfully."
+      )
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -482,4 +553,5 @@ export {
   updateUserAvtar,
   updateUserCoverImage,
   getUserChannelProfile,
+  getWatchHistory,
 };

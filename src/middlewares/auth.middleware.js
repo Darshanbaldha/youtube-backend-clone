@@ -28,6 +28,7 @@ export const verifyJWT = asyncHandler(
       );
 
       console.log(`Auth.Middleware.js 2.Decode Token:- ${decodedToken}`);
+      console.dir(decodedToken);
       
       // select all value except below value to logout. Using id.
       const user = await User.findById(decodedToken?._id).select(
