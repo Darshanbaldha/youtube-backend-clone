@@ -32,4 +32,11 @@ app.use(cookieParser());
 app.use("/api/v1/users", userRouter);
 // http://localhost:8000/api/v1/users/register
 
+app.use("/api/v1/healthcheck");
+app.use("/api/v1/tweets", userRouter);
+app.use("/api/v1/subscriptions", userRouter);
+app.use("/api/v1/video", userRouter);
+app.use("/api/v1/comments", userRouter);
+app.use("/api/v1/likes", userRouter);
+
 export { app };
